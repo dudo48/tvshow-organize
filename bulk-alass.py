@@ -2,7 +2,6 @@ import os
 import subprocess
 from natsort import natsorted
 import argparse
-from modules.utility import convert_to_UTF8
 
 
 def main():

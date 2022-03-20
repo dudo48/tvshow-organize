@@ -1,6 +1,4 @@
 import os
-
-from numpy import mat
 from . import constants
 import re
 from . import patterns
