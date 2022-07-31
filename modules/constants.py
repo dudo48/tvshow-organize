@@ -4,4 +4,4 @@ SEASON_NAME = 'Season {}'
 SUBTITLE_FOLDER_NAME = 'Subtitles'
 EPISODE_STANDARD_NAME = ['{show_name}', 's{season_number}e{episode_number}', '{episode_name}', '{file_version}']
 STANDARD_SEPARATOR = '.'
-EPISODES_NAMES_FILENAME = 'names.txt'
+EPISODES_NAMES_FILENAME = 'episodes_names.csv'

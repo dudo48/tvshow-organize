@@ -1,8 +1,14 @@
-from modules import file_actions
-from modules import utility
-from modules.constants import *
+import sys
 import os
 import argparse
+import csv
+import pyperclip
+from modules import file_actions
+from modules import utility
+from modules import constants
+from modules.constants import *
+from services import search
+from services import tv
 from collections import defaultdict
 
 
@@ -68,34 +74,57 @@ def move_subtitles(path, files):
                         f"Moved '{os.path.basename(filepath)}' to '{os.path.relpath(os.path.dirname(new_path), path)}'")
 
 
+# get episodes names either from existing file or using API
+def get_episodes_names(show_name, path):
+    episodes_names_path = os.path.join(path, constants.EPISODES_NAMES_FILENAME)
+    episodes_names = defaultdict(dict)
+    
+    # read from created file of names if exists else get names using API
+    if os.path.isfile(episodes_names_path):
+        with open(episodes_names_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                season_number = int(row[0])
+                episode_number = int(row[1])
+                episode_name = row[2]
+
+                episodes_names[season_number][episode_number] = episode_name
+    else:
+        # get tv show two times in order to get total count of seasons
+        tv_show = search.get_by_name(show_name)
+        id = tv_show['id']
+        tv_show = tv.get_by_id(id)
+        
+        for s in tv_show['seasons']:
+            season_number = s['season_number']
+            season = tv.get_season(id, season_number)
+            for ep in season['episodes']:
+                episode_number = ep['episode_number']
+                episode_name = utility.clean_filename(ep['name'])
+
+                episodes_names[season_number][episode_number] = episode_name
+        
+        # convert dict to list of lists for easier csv writing
+        episodes_names_list = [[s, ep, episodes_names[s][ep]] for s in episodes_names for ep in episodes_names[s]]
+        with open(episodes_names_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(episodes_names_list)
+
+    return episodes_names
+
 def standard_rename(path, files):
     show_name = os.path.basename(path)
-    try:
-        with open(os.path.join(path, EPISODES_NAMES_FILENAME), encoding='utf-8') as f:
-            episodes_names = f.readlines()
-        episodes_names = [utility.clean_filename(episode_name)
-                          for episode_name in episodes_names]
-    except OSError:
-        episodes_names = None
-
-    if episodes_names:
-        episodes_names_iter = iter(episodes_names)
+    episodes_names = get_episodes_names(show_name, path)
 
     for season_number in sorted(files):
         for episode_number in sorted(files[season_number]):
-
-            if episodes_names:
-                episode_name = next(episodes_names_iter)
-            else:
-                episode_name = ''
-
             for i, filepath in enumerate(files[season_number][episode_number]):
                 file_version = '' if i == 0 else i
                 format_data = {
                     'show_name': show_name,
                     'season_number': str(season_number).zfill(2),
                     'episode_number': str(episode_number).zfill(2),
-                    'episode_name': episode_name,
+                    'episode_name': episodes_names[season_number][episode_number],
                     'file_version': file_version
                 }
 
@@ -113,9 +142,13 @@ def standard_rename(path, files):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('path')
-    args = parser.parse_args()
 
-    path = args.path
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+        path = args.path
+    else:
+        path = pyperclip.paste()
+
     if not os.path.isdir(path):
         print("Invalid path")
         return
