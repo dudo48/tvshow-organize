@@ -1,2 +1,2 @@
-SEASON_NUMBER_PATTERN = r"(?:(?:season|s)\s*)(\d+)|(\d+)(?:\s*(?:x))"
-EPISODE_NUMBER_PATTERN = r"(?:(?:episode|ep|x|e)\s*)(\d+)"
+SEASON_NUMBER_PATTERNS = [r'season\s*(\d+)', r's\s*(\d+)', r'(\d+)\s*x\s*\d+']
+EPISODE_NUMBER_PATTERNS = [r'episode\s*(\d+)', r'ep\s*(\d+)', r'\d+\s*x\s*(\d+)', r'e\s*(\d+)']

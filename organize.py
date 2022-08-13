@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import csv
+from unittest import result
 import pyperclip
 from modules import file_actions
 from modules import utility
@@ -10,6 +11,7 @@ from modules.constants import *
 from services import search
 from services import tv
 from collections import defaultdict
+from pick import pick
 
 
 # returns dict of episodes and dict of subtitles found in a specific path
@@ -35,6 +37,7 @@ def create_structure(path):
                     subtitles[season_number][episode_number].append(filepath)
 
     return episodes, subtitles
+
 
 def move_episodes(path, files):
     for season_number in sorted(files):
@@ -78,7 +81,7 @@ def move_subtitles(path, files):
 def get_episodes_names(show_name, path):
     episodes_names_path = os.path.join(path, constants.EPISODES_NAMES_FILENAME)
     episodes_names = defaultdict(dict)
-    
+
     # read from created file of names if exists else get names using API
     if os.path.isfile(episodes_names_path):
         with open(episodes_names_path, 'r', newline='', encoding='utf-8') as f:
@@ -91,10 +94,24 @@ def get_episodes_names(show_name, path):
                 episodes_names[season_number][episode_number] = episode_name
     else:
         # get tv show two times in order to get total count of seasons
-        tv_show = search.get_by_name(show_name)
+        results = search.get_by_name(show_name)
+
+        # choose if found multiple results from the api
+        if len(results) == 1:
+            tv_show = results[0]
+        else:
+            title = 'Found multiple matches. Please choose the correct show: '
+            choice = pick(
+                results,
+                title,
+                indicator='=>',
+                options_map_func=lambda o: f'{o.get("name", "?")} ({o.get("first_air_date", "?")})'
+            )
+            tv_show = choice[0]
+
         id = tv_show['id']
         tv_show = tv.get_by_id(id)
-        
+
         for s in tv_show['seasons']:
             season_number = s['season_number']
             season = tv.get_season(id, season_number)
@@ -103,14 +120,16 @@ def get_episodes_names(show_name, path):
                 episode_name = utility.clean_filename(ep['name'])
 
                 episodes_names[season_number][episode_number] = episode_name
-        
+
         # convert dict to list of lists for easier csv writing
-        episodes_names_list = [[s, ep, episodes_names[s][ep]] for s in episodes_names for ep in episodes_names[s]]
+        episodes_names_list = [[s, ep, episodes_names[s][ep]]
+                               for s in episodes_names for ep in episodes_names[s]]
         with open(episodes_names_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerows(episodes_names_list)
 
     return episodes_names
+
 
 def standard_rename(path, files):
     show_name = os.path.basename(path)
@@ -128,7 +147,8 @@ def standard_rename(path, files):
                     'file_version': file_version
                 }
 
-                filename = [str.format_map(part, format_data) for part in EPISODE_STANDARD_NAME]
+                filename = [str.format_map(part, format_data)
+                            for part in EPISODE_STANDARD_NAME]
                 filename = [s for s in filename if s]
                 filename = STANDARD_SEPARATOR.join(filename)
 
@@ -136,7 +156,8 @@ def standard_rename(path, files):
                 new_path = file_actions.rename(filepath, filename)
                 if new_path:
                     files[season_number][episode_number][i] = new_path
-                    print(f"Renamed '{old_name}' to '{os.path.basename(new_path)}'")
+                    print(
+                        f"Renamed '{old_name}' to '{os.path.basename(new_path)}'")
 
 
 def main():
